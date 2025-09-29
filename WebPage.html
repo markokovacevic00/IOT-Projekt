@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kontrola Sustava</title>
+    <script src="https://code.jquery.com/jquery-2.0.0.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex justify-center items-center h-screen">
+    <div class="bg-white p-8 rounded-lg shadow-lg w-2/3">
+        <h1 class="text-2xl font-bold mb-4">Kontrola Sustava</h1>
+        <label id="conn_text" class="block mb-4">Connection status: Not connected</label>
+
+        <!-- Status sekcija -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="p-4 bg-blue-100 rounded-lg text-center">
+                <p class="text-lg font-semibold">Trenutna temperatura</p>
+                <p id="temperatura" class="text-2xl">N/A</p>
+            </div>
+            <div class="p-4 bg-green-100 rounded-lg text-center">
+                <p class="text-lg font-semibold">Status vrata</p>
+                <p id="vrata_id" class="text-2xl">Zatvorena</p>
+            </div>
+            <div class="p-4 bg-red-100 rounded-lg text-center">
+                <p class="text-lg font-semibold">Status alarma</p>
+                <p id="alarm_id" class="text-2xl">Neaktivan</p>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-gray-200 p-4 rounded-lg">
+            <h2 class="text-xl font-semibold mb-4">Brze Akcije</h2>
+            <div class="flex space-x-4">
+                <button id="buttonAlarm" value="ON" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700">De/Aktivacija Alarma</button>
+                <button id="buttonTemp" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-700">Postavi Temp. Granicu</button>
+                <input type="number" id="tempInput" name="tempInput" class="px-2 py-1 border rounded-lg" placeholder="Unesi temperaturu">
+            </div>
+        </div>
+    </div>
+
+<script>
+    $(document).ready(function () {
+        var ws = new WebSocket("ws://rpi1:8888/ws");
+
+        ws.onopen = function () {
+            $("#conn_text").text("Connection status: Connected!");
+        };
+
+        ws.onmessage = function (event) {
+            var data = JSON.parse(event.data);
+            console.log("Topic: " + data.topic + ", Message: " + data.message);
+            
+            if (data.topic === "sensor/temp") {
+                $("#temperatura").text(data.message);
+            }
+            if (data.topic === "sensor/alarm") {
+                $("#alarm_id").text(data.message);
+            }
+            if (data.topic === "sensor/door") {
+                $("#vrata_id").text(data.message);
+            }
+        };
+
+        ws.onclose = function () {
+            alert("Connection closed");
+            $("#conn_text").text("Connection status: Disconnected!");
+        };
+
+        setInterval(function(){ ws.send(""); }, 1000);
+
+        $("#buttonAlarm").click(function (evt) {
+            evt.preventDefault();
+            var button = $("#buttonAlarm");
+            var state = button.val().toLowerCase() === "on" ? "off" : "on";
+            button.val(state);
+
+            var data = {
+                topic: "sensor/alarm/control",
+                valueA: state
+            };
+
+            ws.send(JSON.stringify(data));
+        });
+
+        $("#buttonTemp").click(function (evt) {
+            evt.preventDefault();
+            var tempValue = $("#tempInput").val();
+
+            if (tempValue === "" || isNaN(tempValue)) {
+                alert("Molimo unesite valjanu temperaturu.");
+                return;
+            }
+
+            var data = {
+                topic: "sensor/temp/control",
+                valueA: tempValue
+            };
+
+            ws.send(JSON.stringify(data));
+            console.log("Poslana temperatura: " + tempValue);
+        });
+    });
+</script>
+</body>
+</html>
